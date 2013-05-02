@@ -4,11 +4,11 @@
   "description": "http://en.wikipedia.org/wiki/Scaffold_(programming)",
   "version": "0.1",
   "repository": {
-    "url": ""
+    "url": "https://github.com/develasquez/excaffold"
   },
   "main": "./lib/main",
   "bin": {
-    "replaceme": "./bin/replaceme"
+    "excaffold": "./bin/excaffold"
   },
   "dependencies": {},
   "devDependencies": {},
