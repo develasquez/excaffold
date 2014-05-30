@@ -1,22 +1,29 @@
 {
-  "author": "Felipe Velasquez",
-  "name": "excaffold",
-  "description": "http://en.wikipedia.org/wiki/Scaffold_(programming)",
-  "version": "0.1",
-  "repository": {
-    "type":"git",
-    "url": "https://github.com/develasquez/excaffold"
-  },
-  "main": "./lib/main",
-  "bin": {
-    "excaffold": "./bin/excaffold"
-  },
-  "dependencies": {
-    "express":"3.2.1"
-    },
-  "devDependencies": {},
-  "optionalDependencies": {},
-  "engines": {
-    "node": "*"
-  }
+	"name":"excaffold",
+	"version":"0.0.53",
+	"description": "Express complement , like Rails scaffold",
+	"bin":{
+		"excaffold":"excaffold.js"
+	},
+	"dependencies": {
+	"express": "*",
+    "mysql": "*",
+    "commander":"*",
+    "prompt":"*",
+    "socket.io":"*"
+  	},
+   "keywords": [
+    "express",
+    "framework",
+    "rails",
+    "scaffold",
+    "automatic"
+  ],
+   "contributors": [
+    {
+      "name": "Felipe Velasquez",
+      "email": "felipe@desamovil.cl"
+    }
+    ]
+
 }
