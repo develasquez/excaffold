@@ -50,7 +50,7 @@ toMongoDataType = function (dataType) {
                     case 'Datetime' :
                     
                         {
-                            mongoDataType = '[Date]';
+                            mongoDataType = 'Date';
                         }
                         break;
                     case 'Timestamp':
@@ -65,7 +65,7 @@ toMongoDataType = function (dataType) {
                     case 'MediumText':
                     case 'LongText':
                         {
-                            mongoDataType = '[String]';
+                            mongoDataType = 'String';
                         }
                         break;
                     case 'Number':
@@ -82,14 +82,14 @@ toMongoDataType = function (dataType) {
                     case'Decimal':
                     case'Dec':
                         {
-                            mongoDataType = '[Number]';
+                            mongoDataType = 'Number';
                         }
                         break;
                     case 'Bit' :
                     case 'Bool' :
                     case 'Boolean':
                         {
-                            mongoDataType = '[Boolean]';
+                            mongoDataType = 'Boolean';
                         }
                         break;
 
@@ -118,7 +118,7 @@ fs.readFile(path + '/sql.json', function(err, data) {
     } else {
         var _obj_SQL_Config = JSON.parse(data);
         _str_project_name = data.database;
-        main();
+        main(_str_project_name);
     }
 
 });
@@ -149,11 +149,11 @@ function main(project) {
         host: 'localhost',
         user: 'root',
         password: 'password',
-        database: _str_project_name
+        database: project
     };
     var _obj_mongo_file = [
         'var mongoose  = require(\'mongoose\');',
-        'mongoose.connect(\'mongodb://127.0.0.1:27017/'+ _str_project_name +'\');',
+        'mongoose.connect(\'mongodb://127.0.0.1:27017/'+ project +'\');',
         'collections = {};',
         'module.exports = {',
         '    ObjetId:function(string){',
@@ -308,7 +308,7 @@ function main(project) {
 
 
     var _obj_js_SocketIo = [
-        'var ioServer= "http://" + document.location.hostname + ":8080";',
+        'var ioServer= "http://" + document.location.hostname + ":3001";',
         'webSocket = io.connect( ioServer);',
         '	webSocket.on("connect", function(){',
         '		node = webSocket.socket.sessionid;',
@@ -573,7 +573,7 @@ function main(project) {
         ''
                 , '//app.param(\'id\', /^\\d+$/);'
                 , '//app.param(\'range\', /^(\\w+)\\.\\.(\\w+)?$/);'
-                , 'var server = require("socket.io").listen(8080, {log: false });'
+                , 'var server = require("socket.io").listen(3001, {log: false });'
                 , 'server.sockets.on("connection", function (socket) {'
                 , ''
                 , '})'

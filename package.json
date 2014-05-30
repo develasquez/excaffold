@@ -1,6 +1,6 @@
 {
 	"name":"excaffold",
-	"version":"0.0.53",
+	"version":"0.0.55",
 	"description": "Express complement , like Rails scaffold",
 	"bin":{
 		"excaffold":"excaffold.js"
