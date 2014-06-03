@@ -11,7 +11,6 @@ var metaMobile = "meta(name=\"viewport\", content=\"width=device-width, initial-
 var JqJs = "script(src=\"http://code.jquery.com/jquery.min.js\" ,type=\"text/javascript\")";
 var bstwCss = "link(href=\"http://getbootstrap.com/dist/css/bootstrap.min.css\", rel=\"stylesheet\")";
 var bstwJs = "script(src=\"http://getbootstrap.com/dist/js/bootstrap.min.js\" ,type=\"text/javascript\")";
-var skioLib = "script(src=\"/javascript/socket.io.js\" ,type=\"text/javascript\")";
 var skioJs = "script(src=\"/javascripts/connection.js\" ,type=\"text/javascript\")";
 var prompt = require('prompt');
 var _str_project_name = '';
@@ -101,26 +100,22 @@ toMongoDataType = function (dataType) {
 var _str_project_name;
 var pathName = _str_project_name = process.argv[1].split("/")[process.argv[1].split("/").length - 2];
 fs.readFile(path + '/sql.json', function(err, data) {
-    var newProject = false;
-    if (err && pathName === "bin") {
-        newProject = true;
-    }
-    if (newProject === true) {
-        prompt.get(['Project_Name'], function(err, result) {
-            if (err) {
-                return onErr(err);
-            }
-            console.log('Command-line input received:');
-            console.log('Project Name : ' + result.Project_Name);
-            _str_project_name = result.Project_Name;
-            main(result.Project_Name);
-        });
-    } else {
+    if(!err){
+        data = data.toString();
         var _obj_SQL_Config = JSON.parse(data);
-        _str_project_name = data.database;
+        _str_project_name = _obj_SQL_Config.database;
         main(_str_project_name);
+    }else{
+            prompt.get(['Project_Name'], function(err, result) {
+                if (err) {
+                    return onErr(err);
+                }
+                console.log('Command-line input received:');
+                console.log('Project Name : ' + result.Project_Name);
+                _str_project_name = result.Project_Name;
+                main(result.Project_Name);
+            });
     }
-
 });
 
 function main(project) {
@@ -220,7 +215,6 @@ function main(project) {
         '    ' + bstwCss,
         '    ' + JqJs,
         '    ' + bstwJs,
-        '    ' + skioLib,
         '    ' + skioJs,
         '    link(rel=\'stylesheet\', href=\'/stylesheets/style.css\')',
         '  body.container-fluid',
@@ -266,21 +260,19 @@ function main(project) {
         return [
                       '        .form-group'
                     , '          label(for=\"' + el + '\") ' + capitalise(el)
-                    , '          if ' + process.argv[2]
-                    , '            input.form-control#' + el + '(type=\"' + type + '\",placeholder=\"' + el + '\",name=\"' + el + '\",value=\"#{' + process.argv[2] + '.' + el + '}\")'
-                    , '          else'
-                    , '            input.form-control#' + el + '(type=\"' + type + '\",placeholder=\"' + el + '\",name=\"' + el + '\")'
-        ].join(eol);
+                    , '          input.form-control#' + el + '(type=\"' + type + '\",placeholder=\"' + el + '\",name=\"' + el + '\",value=\"#{('+ process.argv[2] + '?'+ process.argv[2] + '.' + el + ':\'\')}\")'
+                ].join(eol);
     };
 
     var _ref_input = function(el) {
         return [
                       '        .form-group'
                     , '          label(for=\"' + el + '\") ' + capitalise(el)
-                    , '          if ' + process.argv[2]
-                    , '            input.form-control#' + el + '(type=\"text\",placeholder=\"' + el + '\",name=\"' + el + '\",value=\"#{' + process.argv[2] + '.' + el + '[0]._id}\")'
-                    , '          else'
-                    , '            input.form-control#' + el + '(type=\"text\",placeholder=\"' + el + '\",name=\"' + el + '\")'
+                    , '          select.form-control#' + el + '(placeholder=\"' + el + '\",name=\"' + el + '\",value=\"#{('+ process.argv[2] + '?' + process.argv[2] + '.' + el + '[0]._id:\'\')}\")'
+                    , '          script.'
+                    , '             $(function () {'
+                    , '                 connection.getRefData(\'' + el + '\',\'_id\',\'#{('+ process.argv[2] + '?' + process.argv[2] + '.' + el + '[0]._id:\'\')}\');'
+                    , '             });'
         ].join(eol);
     };
 
@@ -308,16 +300,20 @@ function main(project) {
 
 
     var _obj_js_SocketIo = [
-        'var ioServer= "http://" + document.location.hostname + ":3001";',
-        'webSocket = io.connect( ioServer);',
-        '	webSocket.on("connect", function(){',
-        '		node = webSocket.socket.sessionid;',
-        '		webSocket.on(node,function(r) {});',
-        '		webSocket.on("disconnect", function(){',
-        '			node = null;',
-        '			webSocket = io.connect(ioServer);',
-        '		});',
-        '	})'
+        '   var connection = {',
+        '       getRefData:function (ref,field) {',
+        '           if(!field){field = \'_id\'}',
+        '           $.ajax({',
+        '               dataType: "json",',
+        '               url: \'/\' + ref + \'.json\',',
+        '               success: function (json) {',
+        '                   $.each(json.data,function (index, element) {',
+        '                       $("#" + ref).append($("<option>").attr("value",element._id).text(element[field]));',
+        '                   })',    
+        '               }',
+        '           });',
+        '       }',
+        '   }'
     ].join(eol);
 
     fs.readFile(path + '/public/javascripts/connection.js', function(err, data) {
@@ -570,13 +566,8 @@ function main(project) {
 
 
     var _str_regEx = [
-        ''
                 , '//app.param(\'id\', /^\\d+$/);'
                 , '//app.param(\'range\', /^(\\w+)\\.\\.(\\w+)?$/);'
-                , 'var server = require("socket.io").listen(3001, {log: false });'
-                , 'server.sockets.on("connection", function (socket) {'
-                , ''
-                , '})'
     ].join(eol);
 
 
@@ -620,7 +611,7 @@ function main(project) {
         _str_JSON_Object = _str_JSON_Object + '{\n';
 
         _str_SQL_Fields = '';
-
+        _str_Jade += '      td _id' + '\n';
         process.argv.forEach(function(val, index, array) {
 
             if (index > 2 && fullPrams.indexOf(val) === -1) {
@@ -628,6 +619,7 @@ function main(project) {
 
                 var _str_name = val.split(":")[0];
                 var _str_type = val.split(":")[1];
+
                 _str_Jade += '      td ' + _str_name + '\n';
                 _str_JSON_Object = _str_JSON_Object + '\t"' + _str_name + '":"' + _str_type + '"';
 
@@ -775,9 +767,8 @@ function main(project) {
                                     .replace("var app = express();", 'var app = express(); ' + _str_regEx);
 
                             fs.writeFile(path + '/app.js', data, function() {
-                            	console.log('1 - run > npm install socket.io');
                             	if(program.mongo){
-                            		console.log('2 - run > npm install mongoose');
+                            		console.log('Now run > npm install mongoose');
                             	}
                                 console.log('See the "app.js" file');
                                 console.log('3 - Now run > node app.js ');

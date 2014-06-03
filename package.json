@@ -1,23 +1,22 @@
 {
 	"name":"excaffold",
-	"version":"0.0.55",
+	"version":"0.0.69",
 	"description": "Express complement , like Rails scaffold",
 	"bin":{
 		"excaffold":"excaffold.js"
 	},
 	"dependencies": {
-	"express": "*",
-    "mysql": "*",
+    "express": "*",
     "commander":"*",
     "prompt":"*",
-    "socket.io":"*"
+    "mysql":"*"
   	},
    "keywords": [
-    "express",
-    "framework",
-    "rails",
-    "scaffold",
-    "automatic"
+      "express",
+      "framework",
+      "rails",
+      "scaffold",
+      "automatic"
   ],
    "contributors": [
     {
