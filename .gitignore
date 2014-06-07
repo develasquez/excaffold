@@ -212,6 +212,6 @@ pip-log.txt
 *.mo
 #node Modules
 node_modules/
-
+.gitignore
 #Mr Developer
 .mr.developer.cfg
