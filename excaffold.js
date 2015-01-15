@@ -19,7 +19,7 @@ var path = '.';
 
 prompt.start();
 program
-        .version('0.0.78')
+        .version('0.0.79')
         .option('-e, --entity', 'Create only the entity, without the basic node.js function')
         .option('-w, --sqlServer', 'Windows Sql Server db engine')
         .option('-s, --mysql', 'mysql db engine')
@@ -308,7 +308,7 @@ function main(project) {
         '           if(!field){field = \'_id\'}',
         '           $.ajax({',
         '               dataType: "json",',
-        '               url: \'/\' + ref + \'.json\',',
+        '               url: \'/\' + ref + \'/list.json\',',
         '               success: function (json) {',
         '                   $.each(json.data,function (index, element) {',
         '                       $("#" + ref).append($("<option>").attr("value",element._id).text(element[field]));',
