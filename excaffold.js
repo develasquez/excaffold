@@ -19,7 +19,7 @@ var path = '.';
 
 prompt.start();
 program
-        .version('0.1')
+        .version('0.0.78')
         .option('-e, --entity', 'Create only the entity, without the basic node.js function')
         .option('-w, --sqlServer', 'Windows Sql Server db engine')
         .option('-s, --mysql', 'mysql db engine')

@@ -1,6 +1,6 @@
 {
 	"name":"excaffold",
-	"version":"0.0.77",
+	"version":"0.0.78",
 	"description": "Express complement , like Rails scaffold",
   "license" : "MIT",
 	"bin":{
