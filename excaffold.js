@@ -580,10 +580,12 @@ function main(project) {
                 , 'router.get(\'/new\', _new);'
                 , 'router.post(\'/new\', _update);'
                 , 'router.get(\'/:id/delete\', _delete);'
+                , 'router.delete(\'/:id\', _delete);'
                 , 'router.get(\'/:id/update\', _update);'
                 , 'router.get(\'/:id/range\',_range);'
                 , 'router.get(\'/:id\', _get);'
                 , 'router.post(\'/:id\', _update);'
+                , 'router.put(\'/:id\', _update);'
                 , 'module.exports = router;'
     ].join(eol);
 
