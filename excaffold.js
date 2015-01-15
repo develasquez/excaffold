@@ -33,12 +33,11 @@ var fullPrams = '-e,--entity,-w,--sqlServer,-s, --mysql-m, --mongo-o, --other';
 
 
 l = function(text) {
+    //
     console.log(text);
 };
-
-
-capitalise = function(string)
-{
+capitalise = function(string){
+    //-
     return string.charAt(0).toUpperCase() + string.slice(1);
 };
 
@@ -95,10 +94,14 @@ toMongoDataType = function (dataType) {
                 }
 
                 return mongoDataType;
-}
+};
+
+
 
 var _str_project_name;
+
 var pathName = _str_project_name = process.argv[1].split("/")[process.argv[1].split("/").length - 2];
+
 fs.readFile(path + '/sql.json', function(err, data) {
     if(!err){
         data = data.toString();
@@ -353,7 +356,7 @@ function main(project) {
 
                 }
                 if (_data_type === 'ref'){
-                    _str_MONGO_polulate = _str_MONGO_polulate + '.populate(\'' + _str_name + '\')\n'
+                    _str_MONGO_polulate = _str_MONGO_polulate + '.populate(\'' + _str_name + '\')\n';
                     _str_MONGO_Object = _str_MONGO_Object + '        ' +(index > 3 ? ',' : '') + _str_name + ':' + "[{ type: Schema.Types.ObjectId, ref: '" + _str_name + "' }]" +'\n';
                 }else{
                     _str_MONGO_Object = _str_MONGO_Object + '        ' +(index > 3 ? ',' : '') + _str_name + ':' + toMongoDataType(_data_type) +'\n';
@@ -491,14 +494,20 @@ function main(project) {
 
 
 
-    var _obj_Route = ['var ' + process.argv[2] + '= require(\'../models/_' + process.argv[2] + '\');'
+    var _obj_Route = [
+                'var express = require(\'express\');'
+                ,'var router = express.Router();'
+                ,'var ' + process.argv[2] + '= require(\'../models/_' + process.argv[2] + '\');'
                 , '_idToString = function (r) {'
                 , '	for (i=0;i<r.length;i++){'
                 , '	r[i]._id = r[i]._id.toString();'
                 , '	}'
                 , 'return r'
                 , '}'
-                , 'exports.list = function(req, res){'
+                , ' _toList = function (req, res) {'
+                , '      res.redirect(\'' +process.argv[2] +'/list\');'
+                , '};'
+                , ' _list = function(req, res){'
                 , '	' + process.argv[2] + '.list([],0,function(r,f) {'
                 , '		try{'
                 , '			r= _idToString(r);'
@@ -511,10 +520,10 @@ function main(project) {
                 , '		}'
                 , '	})'
                 , '};'
-                , 'exports.new = function(req, res){'
+                , ' _new = function(req, res){'
                 , '	res.render(\'__route_new\', { title: \'new __tile\' });'
                 , '};'
-                , 'exports.delete = function(req, res){'
+                , ' _delete = function(req, res){'
                 , '	var _id = req.params.id;'
                 , '	' + process.argv[2] + '.delete([],_id,function(r,f) {'
                 , '		try{'
@@ -524,7 +533,7 @@ function main(project) {
                 , '		}'
                 , '	})'
                 , '};'
-                , 'exports.update = function(req, res){'
+                , ' _update = function(req, res){'
                 , '	var _id = req.params.id;'
                 , '	if (_id){'
                 , '	' + process.argv[2] + '.update(req.body,_id,function(r,f) {'
@@ -544,10 +553,10 @@ function main(project) {
                 , '		})'
                 , '	}'
                 , '};'
-                , 'exports.range = function(req, res){'
+                , ' _range = function(req, res){'
                 , '\tres.render(\'__route_range\', { title: \'__tile\' });'
                 , '};'
-                , ' exports.get = function(req, res){'
+                , ' _get = function(req, res){'
                 , '     var _id = req.params.id.split(".")[0];'
                 , '     var _format = req.params.id.split(".")[1];'
                 , '	    '+ process.argv[2] + '.find(_id,function(r,f) {'
@@ -562,31 +571,27 @@ function main(project) {
                 , '  }'
                 , '})'
                 , '};'
+                ,'/*'
+                , 'Excaffold generated routes'
+                , '*/'
+                , 'router.get(\'/\',_toList);'
+                , 'router.get(\'/list\',_list);'
+                , 'router.get(\'/list.:format/\',_list);'
+                , 'router.get(\'/new\', _new);'
+                , 'router.post(\'/new\', _update);'
+                , 'router.get(\'/:id/delete\', _delete);'
+                , 'router.get(\'/:id/update\', _update);'
+                , 'router.get(\'/:id/range\',_range);'
+                , 'router.get(\'/:id\', _get);'
+                , 'router.post(\'/:id\', _update);'
+                , 'module.exports = router;'
     ].join(eol);
-
-
-    var _str_regEx = [
-                , '//app.param(\'id\', /^\\d+$/);'
-                , '//app.param(\'range\', /^(\\w+)\\.\\.(\\w+)?$/);'
-    ].join(eol);
-
 
     var _str_app_list = [
-        '/*'
-                , 'Scaffold generated routes'
-                , '*/'
-                , 'var ' + process.argv[2] + '= require(\'./routes/' + process.argv[2] + '\');'
-                , 'app.get(\'/' + process.argv[2] + '\', ' + process.argv[2] + '.list);'
-                , 'app.get(\'/' + process.argv[2] + '.:format\', ' + process.argv[2] + '.list);'
-                , 'app.get(\'/' + process.argv[2] + '/new\', ' + process.argv[2] + '.new);'
-                , 'app.post(\'/' + process.argv[2] + '/new\', ' + process.argv[2] + '.update);'
-                , 'app.get(\'/' + process.argv[2] + '/:id/delete\', ' + process.argv[2] + '.delete);'
-                , 'app.get(\'/' + process.argv[2] + '/:id/update\', ' + process.argv[2] + '.update);'
-                , 'app.get(\'/' + process.argv[2] + '/:id/range\', ' + process.argv[2] + '.range);'
-                , 'app.get(\'/' + process.argv[2] + '/:id\', ' + process.argv[2] + '.get);'
-                , 'app.post(\'/' + process.argv[2] + '/:id\', ' + process.argv[2] + '.update);'
-                , ''
-                , ''
+        '/* Excaffold Element */'
+        ,'var ' + process.argv[2] +' = require(\'./routes/'+ process.argv[2] +'\');'
+        ,'app.use(\'/'+ process.argv[2] +'\', '+ process.argv[2] +');'
+        ,''
     ].join(eol);
 
     fs.readFile(path + '/sql.json', function(err, data) {
@@ -761,10 +766,9 @@ function main(project) {
                         });
                         fs.readFile(path + '/app.js', function(err, data) {
                             data = data.toString()
-                                    .replace(_str_regEx, '')
                                     .replace(_str_app_list.toString(), '')
-                                    .replace("http.createServer(app)", _str_app_list + "http.createServer(app)")
-                                    .replace("var app = express();", 'var app = express(); ' + _str_regEx);
+                                    .replace("app.use(express.static(path.join(__dirname, 'public')));","app.use(express.static(path.join(__dirname, 'public')));" + _str_app_list );
+        
 
                             fs.writeFile(path + '/app.js', data, function() {
                             	if(program.mongo){
