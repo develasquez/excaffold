@@ -1,6 +1,6 @@
 {
 	"name":"excaffold",
-	"version":"0.0.76",
+	"version":"0.0.77",
 	"description": "Express complement , like Rails scaffold",
   "license" : "MIT",
 	"bin":{
@@ -9,7 +9,8 @@
 	"dependencies": {
     "express": "*",
     "commander":"*",
-    "prompt":"*"
+    "prompt":"*",
+    "mysql":"*"
   	},
    "keywords": [
       "express",
