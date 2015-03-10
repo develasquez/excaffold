@@ -1,9 +1,7 @@
 #!/usr/bin/env node
-
-
+console.log("Executing...");
 var program = require('commander');
 var fs = require('fs');
-var mysql = require('mysql');
 var os = require('os');
 var eol = os.EOL;
 var fs = require('fs');
@@ -19,25 +17,20 @@ var path = '.';
 
 prompt.start();
 program
-        .version('0.0.80')
+        .version('0.0.81')
         .option('-e, --entity', 'Create only the entity, without the basic node.js function')
-        .option('-w, --sqlServer', 'Windows Sql Server db engine')
-        .option('-s, --mysql', 'mysql db engine')
+        .option('-p, --postgre', 'Postgre SQL db engine')
+        .option('-y, --mysql', 'mysql db engine')
+        .option('-l, --sqlite', 'Sqlite db engine')
         .option('-m, --mongo', 'mongodb db engine')
         .option('-o, --other', 'other db engine , need db_conection.js file http://github.com/develasquez/excaffold/other')
         .parse(process.argv);
 
-
-var fullPrams = '-e,--entity,-w,--sqlServer,-s, --mysql-m, --mongo-o, --other';
-
-
-
+var fullPrams = '-e,--entity,-p,--postgre,-y, --mysql, -m,-l, --sqlite, --mongo,-o, --other';
 l = function(text) {
-    //
     console.log(text);
 };
 capitalise = function(string){
-    //-
     return string.charAt(0).toUpperCase() + string.slice(1);
 };
 
@@ -95,12 +88,10 @@ toMongoDataType = function (dataType) {
 
                 return mongoDataType;
 };
-
-
-
 var _str_project_name;
 
-var pathName = _str_project_name = process.argv[1].split("/")[process.argv[1].split("/").length - 2];
+var pathName = process.argv[1].split("/")[process.argv[1].split("/").length - 2];
+	_str_project_name = pathName;
 
 fs.readFile(path + '/sql.json', function(err, data) {
     if(!err){
@@ -116,12 +107,31 @@ fs.readFile(path + '/sql.json', function(err, data) {
                 console.log('Command-line input received:');
                 console.log('Project Name : ' + result.Project_Name);
                 _str_project_name = result.Project_Name;
-                main(result.Project_Name);
+                
+				
+				if (program.postgre || program.mysql || program.sqlite){
+					console.log('Please introduce the DB Credentials :');
+					if (program.postgre){
+						console.log("if you are using Postgre, need an existing db");
+						prompt.get(['host','user','password', 'db'], function(err, result) {
+							main(_str_project_name, result.host, result.user, result.password, result.db);
+						});
+					}else{
+						prompt.get(['host','user','password'], function(err, result) {
+							main(_str_project_name, result.host, result.user, result.password,null);
+						});
+					}
+				}else{
+					   main(result.Project_Name,null, null, null, null);
+				}
+				
+				
+				
             });
     }
 });
 
-function main(project) {
+function main(project,host,user,password, db) {
 
     if (!program.mysql) {
         program.mongo = true;
@@ -131,10 +141,14 @@ function main(project) {
     if (program.entity)
         onlyEntity = true;
 
-    var sqlServer = null;
-    if (program.sqlServer)
-        sqlServer = require('tedious');
-
+    var postgre = null;
+    if (program.postgre)
+        postgre = require('pg');
+	
+	var sqlite = null;
+    if (program.sqlite)
+        sqlite = require('sqlite3');
+	
     var mysql = null;
     if (!(sqlServer && !mongo) || program.mysql)
         mysql = require('mysql');
@@ -144,10 +158,10 @@ function main(project) {
     var _str_SQL_Query = "";
     var _int_columns_count = process.argv.length - 2;
     var _obj_SQL_Config = {
-        host: 'localhost',
-        user: 'root',
-        password: 'password',
-        database: project
+        host: host || 'localhost',
+        user: user || 'root',
+        password:password || 'password',
+        database: db || project
     };
     var _obj_mongo_file = [
         'var mongoose  = require(\'mongoose\');',
@@ -184,28 +198,33 @@ function main(project) {
 
     var _obj_sql_file = function(conn) {
         return [
-            'var mysql       = require(\'mysql\');',
-            'var connection  = mysql.createConnection(',
-            conn
-                    ,
-            ');',
+            'var DBWrapper = require(\'node-dbi\').DBWrapper; ',
+			'var DBExpr = require(\'node-dbi\').DBExpr;' ,
+			'var dbConnectionConfig =' + conn + ';',
+            
             'module.exports = {',
-            '	sql:function (sql,params,fun){',
-            '	connection.query(sql,params, function(err, rows, fields) {',
-            '    	if (err){',
-            '        	console.log(JSON.stringify(err))',
-            '    	}else{',
-            '        	fun(rows, fields)',
-            '   	}',
-            '	});',
+			'	sysDate: function(){',
+			'			return new DBExpr(\'NOW()\')',
+			'	}',
+            '	conn:function (fun){',
+			'		try{',
+			'			dbWrapper.connect();',
+			'			fun(dbWrapper,null)', //No error return in null
+			'		}',
+			'		catch(ex){',
+			'			fun(null,ex);',
+			'		}',
             '	}',
+			'   close:function(){',
+			'		dbWrapper.close( function(err) {if(err){consloe.log(err)}} );',
+			'	}',
             '}'
         ].join(eol);
     };
 
     _obj_Jade_rows = [
-        '      each el in ' + process.argv[2]
-                , '        tr'];
+        '      each el in ' + process.argv[2],
+        '        tr'];
 
 
 
@@ -375,42 +394,45 @@ function main(project) {
         var mySqlStatement = ['var connection = require(\'../connection\');',
             'module.exports = { ',
             '	insert: function(params, _function){',
-            '	var cSql = "INSERT INTO ' + tableName + ' (' + fieldList + ') VALUES (' + _str_values + ')";   ',
-            '            connection.sql(cSql,params,function(r,f) {',
-            '				_function(r,f)                ',
-            '            })',
+            '   	connection.conn(function(db,err) {',
+			'			db.insert('+ tableName +', params , function(err) {',
+            '				_function(dbWrapper.getLastInsertId() || 0,err);',
+			'				connection.close();',							  
+            '           })',
+			'		});',							  
             '	},',
             '	find: function(params, _function){',
-            '	var words = params.split(" ");',
-            '	var where = \'INSTR( ' + _arr_params[0] + ',  "?" ) >0 \'',
-            '	for (i = 1 ; i < words.length; i++){',
-            '		where = where + \' AND INSTR( ' + _arr_params[0] + ',  "?" ) >0 \'',
-            '	}',
-            '	var rSql = "SELECT _id, ' + fieldList + ' FROM ' + tableName + ' " +',
-            '				"WHERE " + where +',
-            '				"ORDER BY _id ASC";   ',
-            '            connection.sql(rSql,words,function(r,f) {',
-            '                _function(r,f)',
-            '            })',
+            '   	connection.conn(function(db,err) {',
+			'			db.fetchAll(Select _id, ' + fieldList + ' FROM ' + tableName + ' where _id, params , function(err,result) {',
+            '				_function(results,err);',
+			'				connection.close();',							  
+            '           })',
+			'		});',							  
             '	},',
             '	list: function(params, _function){',
-            '	var rSql = "Select _id, ' + fieldList + ' FROM ' + tableName + ' limit 1000";   ',
-            '            connection.sql(rSql,params,function(r,f) {',
-            '                _function(r,f)',
-            '            })',
+            '   	connection.conn(function(db,err) {',
+			'			db.fetchAll(Select _id, ' + fieldList + ' FROM ' + tableName + ' limit 1000, null , function(err,result) {',
+            '				_function(results,err);',
+			'				connection.close();',							  
+            '           })',
+			'		});',							  
             '	},',
-            '	update: function(params, _function){',
-            '	var uSql = "Update ' + tableName + ' set ' + _str_values_update + '";   ',
-            '            connection.sql(uSql,params,function(r,f) {',
-            '				_function(r,f)                ',
-            '            })',
+            '	update: function(params,id, _function){',
+            '   	connection.conn(function(db,err) {',
+			'			db.update(' + tableName + ' , params, [\'_id=?\', id] , function(err,result) {',
+            '				_function(results,err);',
+			'				connection.close();',							  
+            '           })',
+			'		});',							  
             '	},',
-            '	delete: function(params, _function){',
-            '	var dSql = "delete from ' + tableName + '  where ' + _str_values_update + ' ";   ',
-            '            connection.sql(dSql,params,function(r,f) {',
-            '				_function(r,f)                ',
-            '            })',
-            '	}',
+            '	delete: function(params,id, _function){',
+            '   	connection.conn(function(db,err) {',
+			'			db.update(' + tableName + ', [\'_id=?\', id] , function(err,result) {',
+            '				_function(results,err);',
+			'				connection.close();',							  
+            '           })',
+			'		});',							  
+            '	},',
             '}'].join(eol);
 
         var mongoStatement = ['var connection = require(\'../connection\');',
@@ -487,7 +509,7 @@ function main(project) {
         if (program.mongo) {
             conectionEngine = mongoStatement;
         }
-        if (program.mysql) {
+        if (program.postgre || program.mysql || program.sqlite) {
             conectionEngine = mySqlStatement;
         }
         return 	conectionEngine;
@@ -605,13 +627,23 @@ function main(project) {
             _obj_SQL_Config = JSON.parse(data);
 
         }
-
-        var connection = mysql.createConnection({
-            host: _obj_SQL_Config.host,
-            user: _obj_SQL_Config.user,
-            password: _obj_SQL_Config.password
-        });
-
+//////TOTO aqui
+		if(mysql){
+			var connection = mysql.createConnection({
+				host: _obj_SQL_Config.host,
+				user: _obj_SQL_Config.user,
+				password: _obj_SQL_Config.password
+			});
+		}
+        if(postgre){
+			var conString = "postgres://"+ _obj_SQL_Config.user +":" + _obj_SQL_Config.password + "@"+_obj_SQL_Config.host+"/" ;
+			postgre.connect(conString, function(err, client, done) {});
+			var connection = mysql.createConnection({
+				host: _obj_SQL_Config.host,
+				user: _obj_SQL_Config.user,
+				password: _obj_SQL_Config.password
+			});
+		}
 
         _str_JSON_Object = '//Model Name ' + process.argv[2] + '.json\n';
         _str_SQL_Query = 'CREATE TABLE IF NOT EXISTS ' + _obj_SQL_Config.database + '.' + process.argv[2] + ' ( _id INT NOT NULL AUTO_INCREMENT, ';
