@@ -18,7 +18,7 @@ var path = '.';
 
 prompt.start();
 program
-        .version('0.0.103')
+        .version('0.0.118')
         .option('-e, --entity', 'Create only the entity, without the basic node.js function')
         .option('-p, --postgre', 'Postgre SQL db engine')
         .option('-y, --mysql', 'mysql db engine')
@@ -30,7 +30,7 @@ program
 console.log("Executing...");
 console.log("Excaffold version : ", program.version());
 
-var fullPrams = '-e,--entity,-p,--postgre,-y, --mysql, -m,-l, --sqlite, --mongo,-o, --other';
+var fullPrams = '-e,--entity,-p,--postgre,-y, --mysql, -m, --sqlite,-l, --mongo,-o, --other';
 l = function(text) {
     console.log(text);
 };
@@ -139,12 +139,13 @@ function getConnection(engine, dbConf) {
         dbConnectionConfig = dbConf;
     }
     if (engine == "sqlite3") {
-        dbConnectionConfig = {database: dbConf.database};
+        var conf = {database: ":" + dbConf.database + ":"};
+        dbConnectionConfig = conf;
     }
 
     dbWrapper = new DBWrapper(engine, dbConnectionConfig);
     dbWrapper.connect();
-    return dbWrapper
+    return dbWrapper;
 }
 function main(project, host, user, password, db) {
 
@@ -168,9 +169,11 @@ function main(project, host, user, password, db) {
             return false;
         }
     }
+
     if (program.mysql) {
         try {
             mysql = require('mysql');
+            console.log(mysql);
             if (!mysql) {
                 console.log("Please execute: \n npm install -g mysql");
                 return false;
@@ -244,26 +247,80 @@ function main(project, host, user, password, db) {
             engine = 'mysql';
 
         return [
+            'Array.prototype.where = function (query) {',
+            '  if (this === void 0 || this === null) {',
+            '    throw new TypeError();',
+            '  }',
+            'var t = Object(this);',
+            'var len = t.length >>> 0;',
+            'if (typeof query !== \'object\') {',
+            '  throw new TypeError();',
+            '}',
+            'var returnArray = new Array();',
+            'for (attr in query) {',
+            '  returnArray[returnArray.length] = this.filter(function(e,i,a){',
+            '    var obj = e[attr] == this.toString();',
+            '    return obj',
+            '  },query[attr]);',
+            '}',
+            'return returnArray[0];',
+            '};',
+            'Array.prototype.listOf = function (query) {',
+            '  if (this === void 0 || this === null) {',
+            '    throw new TypeError();',
+            '  }',
+            '  var t = Object(this);',
+            '  var len = t.length >>> 0;',
+            '  var result=[];',
+            '  for (i=0;i<t.length;i++){',
+            '    result[result.length]= (t[i])[query];',
+            '  }',
+            '  return result.filter(function(value, index, self) { ',
+            '    return self.indexOf(value) === index;',
+            '  });',
+            '};',
             'module.exports = {',
-            '	sysDate: function(){',
-            '			return new DBExpr(\'NOW()\')',
-            '	},',
-            '	conn:function (fun){',
-            '		try{',
+            '   sysDate: function(){',
+            '           return new DBExpr(\'NOW()\')',
+            '   },',
+            '   conn:function (fun){',
+            '       try{',
             '           var DBWrapper = require(\'node-dbi\').DBWrapper; ',
             '           var DBExpr = require(\'node-dbi\').DBExpr;',
             '           var dbConnectionConfig =' + conn + ';',
             '           dbWrapper = new DBWrapper( \'' + engine + '\', dbConnectionConfig );',
-            '			dbWrapper.connect();',
-            '			fun(dbWrapper,null)', //No error return in null
-            '		}',
-            '		catch(ex){',
-            '			fun(null,ex);',
-            '		}',
-            '	},',
+            '           dbWrapper.connect();',
+            '           fun(dbWrapper,null)', //No error return in null
+            '       }',
+            '       catch(ex){',
+            '           fun(null,ex);',
+            '       }',
+            '   },',
+            '   exec:function(results,populate,_fun,err){',
+            '        if(results.length == 0 || populate.length == 0){',
+            '            _fun(results,err);',
+            '            return;',
+            '        }',
+            '        var toPolulate = populate.length;',
+            '        var populated = 0;',
+            '        for (var i = 0; i < populate.length; i++) {',
+            '            var model = require("./models/_" + populate[i].replace(/_id$/, \'\'));',
+            '            var ids = results.listOf(populate[i]+"_id");',
+            '            model.in(ids,function(rows,err){',
+            '                for(r in results){',
+            '                   var ref =  rows.where({"_id":(results[r])[populate[i]+"_id"]});',
+            '                   (results[r])[populate[i]] = ref;',
+            '                }',
+            '                populated++;',
+            '                if(populated == toPolulate){',
+            '                    _fun(results,err);',
+            '                }',
+            '            })',
+            '        };',
+            '   },',
             '   close:function(){',
-            '		dbWrapper.close( function(err) {if(err){consloe.log(err)}} );',
-            '	}',
+            '       dbWrapper.close( function(err) {if(err){consloe.log(err)}} );',
+            '   }',
             '}'
         ].join(eol);
     };
@@ -348,7 +405,7 @@ function main(project, host, user, password, db) {
         return [
             '        .checkbox'
                     , '          label'
-                    , '            if ' + process.argv[2] + '.' + el + '==\"' + el + '\"'
+                    , '            if ' + process.argv[2] + '==\"' + el + '\"'
                     , '              input(type="checkbox",value=\"' + el + '\",checked="checked") '
                     , '              | ' + capitalise(el)
                     , '            else'
@@ -373,7 +430,7 @@ function main(project, host, user, password, db) {
         '           if(!field){field = \'_id\'}',
         '           $.ajax({',
         '               dataType: "json",',
-        '               url: \'/\' + ref + \'/list.json\',',
+        '               url: \'/\' + ref.replace(/_id$/, \'\') + \'/list.json\',',
         '               success: function (json) {',
         '                   $.each(json.data,function (index, element) {',
         '                       $("#" + ref).append($("<option>").attr("value",element._id).text(element[field]));',
@@ -414,6 +471,7 @@ function main(project, host, user, password, db) {
 
         _str_MONGO_Object = 'mongoObj = {\n';
         _str_MONGO_polulate = '';
+        _str_SQL_polulate = '['
         process.argv.forEach(function(val, index, array) {
             if (index > 2 && fullPrams.indexOf(val) === -1) {
                 var _str_name = val.split(":")[0];
@@ -423,141 +481,141 @@ function main(project, host, user, password, db) {
                 }
                 if (_data_type === 'ref') {
                     _str_MONGO_polulate = _str_MONGO_polulate + '.populate(\'' + _str_name + '\')\n';
+                    _str_SQL_polulate = _str_SQL_polulate +  (_str_SQL_polulate.length > 1 ? "," : "") + '\''+ _str_name + '\'';
                     _str_MONGO_Object = _str_MONGO_Object + '        ' + (index > 3 ? ',' : '') + _str_name + ':' + "[{ type: Schema.Types.ObjectId, ref: '" + _str_name + "' }]" + '\n';
                 } else {
                     _str_MONGO_Object = _str_MONGO_Object + '        ' + (index > 3 ? ',' : '') + _str_name + ':' + toMongoDataType(_data_type) + '\n';
                 }
-
-
-
             }
             if (index === process.argv.length - 1)
             {
                 _str_MONGO_Object += '\n}\n';
+                _str_SQL_polulate += ']'
             }
         });
 
         var mySqlStatement = ['var connection = require(\'../connection\');',
             'module.exports = { ',
-            '	insert: function(params, _function){',
-            '   	connection.conn(function(db,err) {',
-            '           if(err){console.log(err);}',
-            '			db.insert(\'' + tableName + '\', params , function(err) {',
-            '               if(err){console.log(err);}',
-            '				_function(dbWrapper.getLastInsertId() || 0,err);',
-            '				connection.close();',
+            '   insert: function(params, _function){',
+            '       connection.conn(function(db,err) {',
+            '           db.insert(\'' + tableName + '\', params , function(err) {',
+            '               _function(dbWrapper.getLastInsertId() || 0,err);',
+            '               connection.close();',
             '           })',
-            '		});',
-            '	},',
-            '	find: function(params, _function){',
-            '   	connection.conn(function(db,err) {',
-            '           if(err){console.log(err);}',
-            '			db.fetchAll("Select _id, ' + fieldList + ' FROM ' + tableName + ' where _id=?", params , function(err,results) {',
-            '              if(err){console.log(err);}',
-            '				_function(results,err);',
-            '				connection.close();',
+            '       });',
+            '   },',
+            '   find: function(params, _function){',
+            '       connection.conn(function(db,err) {',
+            '           db.fetchAll("Select _id, ' + fieldList + ' FROM ' + tableName + ' where _id=?", [params] , function(err,results) {',
+            '               var populate= '+ _str_SQL_polulate ,
+            '               connection.close();',
+            '               connection.exec(results,populate,_function,err);',
             '           })',
-            '		});',
-            '	},',
-            '	list: function(params, page,  _function){',
-            '   	connection.conn(function(db,err) {',
-            '           if(err){console.log(err);}',
-            '			db.fetchAll("Select _id, ' + fieldList + ' FROM ' + tableName + ' limit 1000", null , function(err,results) {',
-            '              if(err){console.log(err);}',
-            '				_function(results,err);',
-            '				connection.close();',
+            '       });',
+            '   },',
+            '   list: function(params, page,  _function){',
+            '       connection.conn(function(db,err) {',
+            '           db.fetchAll("Select _id, ' + fieldList + ' FROM ' + tableName + ' limit 1000", null , function(err,results) {',
+            '               var populate= '+ _str_SQL_polulate ,
+            '               connection.close();',
+            '               connection.exec(results,populate,_function,err);',
             '           })',
-            '		});',
-            '	},',
-            '	update: function(params,id, _function){',
-            '   	connection.conn(function(db,err) {',
-            '           if(err){console.log(err);}',
-            '			db.update(\'' + tableName + '\' , params, [\'_id=?\', id] , function(err,results) {',
-            '              if(err){console.log(err);}',
-            '				_function(results,err);',
-            '				connection.close();',
+            '       });',
+            '   },',
+            '   in: function(params,  _function){',
+            '       connection.conn(function(db,err) {',
+            '           db.query("Select _id, ' + fieldList + ' FROM ' + tableName + ' where _id in(" + params.join(",") + ")"  , function(err,results) {',
+            '               var populate= '+ _str_SQL_polulate ,
+            '               connection.close();',
+            '               _function(results,err);',
             '           })',
-            '		});',
-            '	},',
-            '	delete: function(params,id, _function){',
-            '   	connection.conn(function(db,err) {',
-            '           if(err){console.log(err);}',
-            '			db.remove(\'' + tableName + '\', [\'_id=?\', id] , function(err,results) {',
-            '              if(err){console.log(err);}',
-            '				_function(results,err);',
-            '				connection.close();',
+            '       });',
+            '   },',
+            '   update: function(params,id, _function){',
+            '       connection.conn(function(db,err) {',
+            '           db.update(\'' + tableName + '\' , params, [[\'_id=?\', id]] , function(err,results) {',
+            '               _function(results,err);',
+            '               connection.close();',
             '           })',
-            '		});',
-            '	},',
+            '       });',
+            '   },',
+            '   delete: function(params,id, _function){',
+            '       connection.conn(function(db,err) {',
+            '           db.remove(\'' + tableName + '\', [[\'_id=?\', id]] , function(err,results) {',
+            '               _function(results,err);',
+            '               connection.close();',
+            '           })',
+            '       });',
+            '   },',
             '}'].join(eol);
 
         var mongoStatement = ['var connection = require(\'../connection\');',
             'var mongoose = require(\'mongoose\')',
             ', Schema = mongoose.Schema',
             'var mySelf = { ',
-            '	getMongoObj: function(params){',
-            '		' + _str_MONGO_Object + ' ',
-            '		return mongoObj;',
-            '	},',
-            '	insert: function(params, _function){',
-            '			schema = mySelf.getMongoObj();',
+            '   getMongoObj: function(params){',
+            '       ' + _str_MONGO_Object + ' ',
+            '       return mongoObj;',
+            '   },',
+            '   insert: function(params, _function){',
+            '           schema = mySelf.getMongoObj();',
             '           connection.open(\'' + tableName + '\',schema ,function(collection,error) {',
-            '				if(error){ _function(undefined,error); return false; }',
-            '				collection.create(params,function(err, docs){',
-            '					_function(docs,err)',
-            '            	})',
-            '          	})',
-            '	},',
-            '	find: function(id, _function){',
-            '			schema = mySelf.getMongoObj();',
+            '               if(error){ _function(undefined,error); return false; }',
+            '               collection.create(params,function(err, docs){',
+            '                   _function(docs,err)',
+            '               })',
+            '           })',
+            '   },',
+            '   find: function(id, _function){',
+            '           schema = mySelf.getMongoObj();',
             '           connection.open(\'' + tableName + '\',schema ,function(collection,error) {',
-            '			var query = collection.find({_id:connection.ObjetId(id)})',
+            '           var query = collection.find({_id:connection.ObjetId(id)})',
             '           query' + _str_MONGO_polulate + '.exec(function(err, docs) { ',
-            '					_function(docs,err)',
-            '            	})',
-            '          	})',
-            '	},',
-            '	list: function(params,page, _function){',
-            '			schema = mySelf.getMongoObj();',
-            '			if(typeof page === "function"){_function = page; page = 0 ;}',
+            '                   _function(docs,err)',
+            '               })',
+            '           })',
+            '   },',
+            '   list: function(params,page, _function){',
+            '           schema = mySelf.getMongoObj();',
+            '           if(typeof page === "function"){_function = page; page = 0 ;}',
             '           connection.open(\'' + tableName + '\',schema ,function(collection,error) {',
-            '				var query = collection.find({})',
+            '               var query = collection.find({})',
             '               query' + _str_MONGO_polulate + '.exec(function(err, docs) { ',
-            '					_function(docs,err)',
-            '            	})',
-            '          	})',
-            '	},',
-            '	update: function(params,id, _function){',
-            '			schema = mySelf.getMongoObj();',
-            '			var whereObject ;',
-            '			if(typeof id === "function"){_function = id; id = 0 ;}',
-            '			if(id===0){',
-            '				whereObject = {\'' + _arr_params[0] + '\':params[0]};',
-            '			}else{',
-            '				whereObject = {_id:connection.ObjetId(id)};',
-            '			}',
+            '                   _function(docs,err)',
+            '               })',
+            '           })',
+            '   },',
+            '   update: function(params,id, _function){',
+            '           schema = mySelf.getMongoObj();',
+            '           var whereObject ;',
+            '           if(typeof id === "function"){_function = id; id = 0 ;}',
+            '           if(id===0){',
+            '               whereObject = {\'' + _arr_params[0] + '\':params[0]};',
+            '           }else{',
+            '               whereObject = {_id:connection.ObjetId(id)};',
+            '           }',
             '           connection.open(\'' + tableName + '\',schema ,function(collection,error) {',
-            '				collection.update(whereObject,{$set:params},{multi:true},function(err, docs) { ',
-            '					_function(docs,err) ',
-            '            	})',
-            '          	})',
-            '	},',
-            '	delete: function(params,id, _function){',
-            '			var whereObject ;',
-            '			if(typeof id === "function"){_function = id; id = 0 ;}',
-            '			if(id===0){',
-            '				whereObject = {\'' + _arr_params[0] + '\':params[0]};',
-            '			}else{',
-            '				whereObject = {_id:id};',
-            '			}',
-            '			schema = mySelf.getMongoObj();',
+            '               collection.update(whereObject,{$set:params},{multi:true},function(err, docs) { ',
+            '                   _function(docs,err) ',
+            '               })',
+            '           })',
+            '   },',
+            '   delete: function(params,id, _function){',
+            '           var whereObject ;',
+            '           if(typeof id === "function"){_function = id; id = 0 ;}',
+            '           if(id===0){',
+            '               whereObject = {\'' + _arr_params[0] + '\':params[0]};',
+            '           }else{',
+            '               whereObject = {_id:id};',
+            '           }',
+            '           schema = mySelf.getMongoObj();',
             '           connection.open(\'' + tableName + '\',schema ,function(collection,error) {',
-            '				if(error){ _function(undefined,error); return false; }',
-            '				collection.remove(whereObject,function () {',
-            '				})',
-            '				mySelf.list([],0, _function) ',
-            '          	})',
-            '	}',
+            '               if(error){ _function(undefined,error); return false; }',
+            '               collection.remove(whereObject,function () {',
+            '               })',
+            '               mySelf.list([],0, _function) ',
+            '           })',
+            '   }',
             '}',
             'module.exports = mySelf;'].join(eol);
 
@@ -568,7 +626,7 @@ function main(project, host, user, password, db) {
         if (program.postgre || program.mysql || program.sqlite) {
             conectionEngine = mySqlStatement;
         }
-        return 	conectionEngine;
+        return  conectionEngine;
     };
 
 
@@ -578,59 +636,59 @@ function main(project, host, user, password, db) {
                 , 'var router = express.Router();'
                 , 'var ' + process.argv[2] + '= require(\'../models/_' + process.argv[2] + '\');'
                 , '_idToString = function (r) {'
-                , '	for (i=0;i<r.length;i++){'
-                , '	r[i]._id = r[i]._id.toString();'
-                , '	}'
+                , ' for (i=0;i<r.length;i++){'
+                , ' r[i]._id = r[i]._id.toString();'
+                , ' }'
                 , 'return r'
                 , '}'
                 , ' _toList = function (req, res) {'
                 , '      res.redirect(\'' + process.argv[2] + '/list\');'
                 , '};'
                 , ' _list = function(req, res){'
-                , '	' + process.argv[2] + '.list([],0,function(r,f) {'
-                , '		try{'
-                , '			r= _idToString(r);'
+                , ' ' + process.argv[2] + '.list([],0,function(r,f) {'
+                , '     try{'
+                , '         r= _idToString(r);'
                 , '         if (req.params.format !="json"){'
-                , ' 			res.render(\'' + process.argv[2] + '\', { title: \'' + capitalise(process.argv[2]) + '\', ' + process.argv[2] + ' : r });'
+                , '             res.render(\'' + process.argv[2] + '\', { title: \'' + capitalise(process.argv[2]) + '\', ' + process.argv[2] + ' : r });'
                 , '         }else{'
                 , '             res.send({data:r})'
                 , '         }'
-                , '		}catch(ex){'
-                , '		}'
-                , '	})'
+                , '     }catch(ex){'
+                , '     }'
+                , ' })'
                 , '};'
                 , ' _new = function(req, res){'
-                , '	res.render(\'__route_new\', { title: \'new __tile\' });'
+                , ' res.render(\'__route_new\', { title: \'new __tile\' });'
                 , '};'
                 , ' _delete = function(req, res){'
-                , '	var _id = req.params.id;'
-                , '	' + process.argv[2] + '.delete([],_id,function(r,f) {'
-                , '		try{'
-                , '			r= _idToString(r);'
-                , '			res.render(\'' + process.argv[2] + '\', { title: \'' + capitalise(process.argv[2]) + '\', ' + process.argv[2] + ' : r });'
-                , '		}catch(ex){'
-                , '		}'
-                , '	})'
+                , ' var _id = req.params.id;'
+                , ' ' + process.argv[2] + '.delete([],_id,function(r,f) {'
+                , '     try{'
+                , '         r= _idToString(r);'
+                , '         res.render(\'' + process.argv[2] + '\', { title: \'' + capitalise(process.argv[2]) + '\', ' + process.argv[2] + ' : r });'
+                , '     }catch(ex){'
+                , '     }'
+                , ' })'
                 , '};'
                 , ' _update = function(req, res){'
-                , '	var _id = req.params.id;'
-                , '	if (_id){'
-                , '	' + process.argv[2] + '.update(req.body,_id,function(r,f) {'
-                , '		try{'
-                , '			r= _idToString(r);'
-                , '			res.render(\'' + process.argv[2] + '_new\', { title: \'' + capitalise(process.argv[2]) + '\', ' + process.argv[2] + ' : r[0] });'
-                , '		}catch(ex){'
-                , '		}'
-                , '	})'
+                , ' var _id = req.params.id;'
+                , ' if (_id){'
+                , ' ' + process.argv[2] + '.update(req.body,_id,function(r,f) {'
+                , '     try{'
+                , '         r= _idToString(r);'
+                , '         res.render(\'' + process.argv[2] + '_new\', { title: \'' + capitalise(process.argv[2]) + '\', ' + process.argv[2] + ' : r[0] });'
+                , '     }catch(ex){'
+                , '     }'
+                , ' })'
                 , '}else{'
-                , '	' + process.argv[2] + '.insert(req.body,function(r,f) {'
-                , '		try{'
-                , '			r = _idToString(r);'
-                , '			res.render(\'' + process.argv[2] + '_new\', { title: \'' + capitalise(process.argv[2]) + '\', ' + process.argv[2] + ' : r[0] });'
-                , '		}catch(ex){'
-                , '		}'
-                , '		})'
-                , '	}'
+                , ' ' + process.argv[2] + '.insert(req.body,function(r,f) {'
+                , '     try{'
+                , '         r = _idToString(r);'
+                , '         res.render(\'' + process.argv[2] + '_new\', { title: \'' + capitalise(process.argv[2]) + '\', ' + process.argv[2] + ' : r[0] });'
+                , '     }catch(ex){'
+                , '     }'
+                , '     })'
+                , ' }'
                 , '};'
                 , ' _range = function(req, res){'
                 , '\tres.render(\'__route_range\', { title: \'__tile\' });'
@@ -638,15 +696,15 @@ function main(project, host, user, password, db) {
                 , ' _get = function(req, res){'
                 , '     var _id = req.params.id.split(".")[0];'
                 , '     var _format = req.params.id.split(".")[1];'
-                , '	    ' + process.argv[2] + '.find(_id,function(r,f) {'
-                , '	    try{'
-                , '		   r = _idToString(r);'
+                , '     ' + process.argv[2] + '.find(_id,function(r,f) {'
+                , '     try{'
+                , '        r = _idToString(r);'
                 , '         if (_format !="json"){'
-                , '		       res.render(\'' + process.argv[2] + '_new\', { title: \'' + capitalise(process.argv[2]) + '\', ' + process.argv[2] + ' : r[0] });'
+                , '            res.render(\'' + process.argv[2] + '_new\', { title: \'' + capitalise(process.argv[2]) + '\', ' + process.argv[2] + ' : r[0] });'
                 , '         }else{'
                 , '             res.send({data:r})'
                 , '         }'
-                , '	    }catch(ex){'
+                , '     }catch(ex){'
                 , '  }'
                 , '})'
                 , '};'
@@ -714,10 +772,8 @@ function main(project, host, user, password, db) {
         _str_SQL_Fields = '';
         _str_Jade += '      td _id' + '\n';
         process.argv.forEach(function(val, index, array) {
-            console.log("Creating ", val);
 
             if (index > 2 && fullPrams.indexOf(val) === -1) {
-                console.log("Creating ", val);
 
                 var _str_name = val.split(":")[0];
                 var _str_type = val.split(":")[1];
@@ -779,8 +835,8 @@ function main(project, host, user, password, db) {
                         break;
 
                 }
-                console.log(_str_SQL_Query);
                 _str_inputs[_str_inputs.length] = newImputElement;
+                _str_type = _str_type.replace("ref","int");
                 if (program.mysql) {
                     _str_SQL_Query += _str_name + ' ' + _str_type.replace('text', 'VARCHAR(50) CHARACTER SET utf8 COLLATE utf8_bin ');
                 }
@@ -827,9 +883,10 @@ function main(project, host, user, password, db) {
                     engine = "sqlite3";
                 }
                 connection = getConnection(engine, _obj_SQL_Config);
-
+                console.log(_str_SQL_Query);
                 connection.query(_str_SQL_Query, [], function(err, rows) {
                     if (err) {
+                        console.log(err);
                         if (err.code === "ER_BAD_DB_ERROR") {
                             console.log("The DB '" + _obj_SQL_Config.database + "' doesn't exist, I will create it...");
                             connection.query("CREATE DATABASE " + _obj_SQL_Config.database, function(err, rows) {
@@ -929,8 +986,8 @@ function main(project, host, user, password, db) {
             }
             if (program.sqlite) {
                 var conn = {
-                    database: _obj_SQL_Config.database
-                }
+                    database: ":" + _obj_SQL_Config.database + ":"
+                };
                 conectionEngine = _obj_sql_file(JSON.stringify(conn));
             }
             fs.writeFile(path + '/connection.js', conectionEngine, function() {
